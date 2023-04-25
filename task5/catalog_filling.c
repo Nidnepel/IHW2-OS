@@ -7,7 +7,7 @@
 #include <semaphore.h>
 #include <time.h>
 
-#define SHM_SIZE 8
+const int SHM_SIZE = 8;
 
 sem_t *sem_producer;
 sem_t *sem_bookhandler;
@@ -16,10 +16,8 @@ int shm_fd;
 void *shm_ptr;
 
 void destroy(int num) {
-    sem_close(sem_producer);
-    sem_close(sem_bookhandler);
-    sem_unlink("/producer");
-    sem_unlink("/bookhandler");
+    sem_destroy(sem_producer);
+    sem_destroy(sem_bookhandler);
     shm_unlink("/shared");
     munmap(shm_ptr, SHM_SIZE);
     close(shm_fd);
@@ -70,8 +68,11 @@ int main(int argc, char *argv[]) {
     }
 
     // create semaphore
-    sem_producer = sem_open("/producer", O_CREAT, 0666, 0); // 0 default
-    sem_bookhandler = sem_open("/bookhandler", O_CREAT, 0666, 1);  // 1 default
+    sem_producer = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+    sem_bookhandler = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0);
+
+    sem_init(sem_producer, 1, 0); // 0 default
+    sem_init(sem_bookhandler, 1, 1);  // 1 default
 
     if (sem_producer == SEM_FAILED || sem_bookhandler == SEM_FAILED) {
         perror("sem_open");
@@ -117,10 +118,8 @@ int main(int argc, char *argv[]) {
     sem_wait(sem_bookhandler);
 
     //clean data
-    sem_close(sem_producer);
-    sem_close(sem_bookhandler);
-    sem_unlink("/producer");
-    sem_unlink("/bookhandler");
+    sem_destroy(sem_producer);
+    sem_destroy(sem_bookhandler);
     shm_unlink("/shared");
     munmap(shm_ptr, SHM_SIZE);
     close(shm_fd);
